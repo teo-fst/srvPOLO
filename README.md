@@ -89,7 +89,7 @@ giovanna.verdi
 ```bash
 #!/bin/bash
 # Configurazione
-TOKEN="IL_TUO_API_TOKEN"
+TOKEN="ptr_Eb+RAQrc7VxoWEGrxXL3Bpz4FwMOG7KGl+p0rSTp3V8="
 PORTAINER_URL="https://localhost:9443/api"
 TEAM_ID=2 # Trova l'ID nel pannello Team di Portainer
 
