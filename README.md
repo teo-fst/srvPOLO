@@ -113,7 +113,7 @@ CLASSE="$2"            # Identificativo della classe (es. 3A).
 ANNO="$(date +%Y)"
 
 # Definisce la base delle home degli studenti.
-BASE_DIR="/as_${ANNO}/${CLASSE}"
+BASE_DIR="/home/root/as_${ANNO}/${CLASSE}"
 
 # Definisce il gruppo primario per gli studenti della classe.
 GRUPPO="studenti_${CLASSE}"
@@ -127,8 +127,8 @@ fi
 mkdir -p "$BASE_DIR"
 
 # Imposta i permessi in modo che solo root e il proprietario delle sottodirectory possano accedere.
-chmod 755 "/as_${ANNO}"        # Leggibile da tutti, scrivibile solo da root.
-chown root:root "/as_${ANNO}"  # Necessario per eventuali chroot futuri.
+chmod 755 "/home/root/as_${ANNO}"        # Leggibile da tutti, scrivibile solo da root.
+chown root:root "/home/root/as_${ANNO}"  # Necessario per eventuali chroot futuri.
 chmod 755 "$BASE_DIR"          # Leggibile da tutti, scrivibile solo da root.
 chown root:root "$BASE_DIR"    # Le home degli studenti saranno sottodirectory.
 
@@ -173,7 +173,7 @@ while IFS=';' read -r COGNOME NOME; do
   chown "$USERNAME:$GRUPPO" "$HOME_DIR"  # Proprietario: utente, gruppo: classe.
 
   # Definisce la password di default (stessa per tutti nella classe).
-  DEFAULT_PASS="Pwd${ANNO}!${CLASSE}"
+  DEFAULT_PASS="1234567890abcdef"
 
   # Imposta la password per l'utente.
   echo "${USERNAME}:${DEFAULT_PASS}" | chpasswd
@@ -192,11 +192,27 @@ echo "[OK] Utenti creati per la classe ${CLASSE}. Dettagli in ${OUTPUT_PASS_FILE
 
 #### Esecuzione dello script
 
-Esempio di esecuzione per la classe `3A`:
+Esempio di esecuzione per la classe `6A`:
 
 ```bash
-sudo bash create_students_linux.sh studenti_3A.csv 3A
+sudo bash create_students_linux.sh studenti_test.csv 6A
 ```
+
+test per i nuovi utenti e test reset password:
+`bash sudo su - rossi_mario` oppure eseguire nuova connessione `ssh rossi_mario@<IP_VM>`
+
+
+Per rimuovere il test eseguire:
+```bash
+sudo getent groups #mostra gruppi utenti
+sudo delgroup studenti_6A
+
+sudo getent passwd #mostra utenti
+sudo deluser rossi_mario
+sudo deluser bianchi_luca
+sudo deluser verdi_anna
+```
+
 
 ### Note su isolamento della home
 

@@ -1,0 +1,94 @@
+#!/usr/bin/env bash
+# Abilita modalità rigorosa: interrompe lo script in caso di errore.
+set -euo pipefail
+
+# Verifica che siano stati passati esattamente due argomenti.
+if [ "$#" -ne 2 ]; then
+  echo "Uso: $0 studenti.csv CLASSE" >&2
+  exit 1
+fi
+
+# Assegna i parametri a variabili leggibili.
+CSV_FILE="$1"          # Percorso del file CSV con l'elenco studenti.
+CLASSE="$2"            # Identificativo della classe (es. 3A).
+
+# Calcola l'anno corrente (es. 2026).
+ANNO="$(date +%Y)"
+
+# Definisce la base delle home degli studenti.
+BASE_DIR="/as_${ANNO}/${CLASSE}"
+
+# Definisce il gruppo primario per gli studenti della classe.
+GRUPPO="studenti_${CLASSE}"
+
+# Crea il gruppo se non esiste già.
+if ! getent group "$GRUPPO" > /dev/null 2>&1; then
+  groupadd "$GRUPPO"
+fi
+
+# Crea la gerarchia di directory base per l'anno e la classe.
+mkdir -p "$BASE_DIR"
+
+# Imposta i permessi in modo che solo root e il proprietario delle sottodirectory possano accedere.
+chmod 755 "/as_${ANNO}"        # Leggibile da tutti, scrivibile solo da root.
+chown root:root "/as_${ANNO}"  # Necessario per eventuali chroot futuri.
+chmod 755 "$BASE_DIR"          # Leggibile da tutti, scrivibile solo da root.
+chown root:root "$BASE_DIR"    # Le home degli studenti saranno sottodirectory.
+
+# File di output con utenti e password iniziali.
+OUTPUT_PASS_FILE="studenti_passwords_${CLASSE}.csv"
+
+echo "username;password;classe" > "$OUTPUT_PASS_FILE"
+
+# Legge il CSV riga per riga usando ';' come separatore di campo.
+while IFS=';' read -r COGNOME NOME; do
+  # Salta righe vuote.
+  if [ -z "${COGNOME}" ]; then
+    continue
+  fi
+
+  # Salta l'eventuale riga di intestazione.
+  if [ "$COGNOME" = "cognome" ] || [ "$COGNOME" = "Cognome" ]; then
+    continue
+  fi
+
+  # Normalizza cognome e nome: minuscolo, spazi in '_', solo caratteri ammessi.
+  U_COGNOME="$(echo "$COGNOME" | tr '[:upper:]' '[:lower:]' | tr ' ' '_' | tr -cd 'a-z0-9_')"
+  U_NOME="$(echo "$NOME" | tr '[:upper:]' '[:lower:]' | tr ' ' '_' | tr -cd 'a-z0-9_')"
+
+  # Costruisce l'username nel formato cognome_nome.
+  USERNAME="${U_COGNOME}_${U_NOME}"
+
+  # Definisce la home dell'utente.
+  HOME_DIR="${BASE_DIR}/${USERNAME}"
+
+  # Se l'utente esiste già, lo segnala e passa al prossimo.
+  if id "$USERNAME" > /dev/null 2>&1; then
+    echo "[INFO] Utente $USERNAME esiste già, salto." >&2
+    continue
+  fi
+
+  # Crea l'utente con home dedicata e shell bash.
+  useradd -m -d "$HOME_DIR" -s /bin/bash -g "$GRUPPO" "$USERNAME"
+
+  # Imposta permessi restrittivi sulla home.
+  chmod 700 "$HOME_DIR"            # Solo l'utente può leggere/scrivere.
+  chown "$USERNAME:$GRUPPO" "$HOME_DIR"  # Proprietario: utente, gruppo: classe.
+
+  # Definisce la password di default (stessa per tutti nella classe).
+  DEFAULT_PASS="0123456789abcdef"
+
+  # Imposta la password per l'utente.
+  echo "${USERNAME}:${DEFAULT_PASS}" | chpasswd
+
+  # Forza il cambio password al primo login.
+  chage -d 0 "$USERNAME"
+
+  # Registra username e password nel file di output.
+  echo "${USERNAME};${DEFAULT_PASS};${CLASSE}" >> "$OUTPUT_PASS_FILE"
+
+done < "$CSV_FILE"
+
+# Messaggio finale.
+echo "[OK] Utenti creati per la classe ${CLASSE}. Dettagli in ${OUTPUT_PASS_FILE}."
+
